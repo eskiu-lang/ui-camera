@@ -1,0 +1,100 @@
+// <camera> with no device: the platform's side is stand-ins that count their calls, and the
+// test sends the events a platform would. Each check that fails exits with 1.
+import <io>;
+import <string>;
+import <ui>;
+import <camera>;
+
+int picks;
+int takes;
+int captures;
+
+void camera_native_pick() { picks++; }
+
+void camera_native_take() { takes++; }
+
+void camera_native_capture() { captures++; }
+
+String last;
+int photos;
+int native_views;
+
+void check(bool ok, string what) {
+    if (!ok) {
+        printf("FAIL %s (last: %s)\n", what, last.data == null ? "" : last.data);
+        exit(1);
+    }
+}
+
+*Signal<int> mounted;
+
+void Screen() {
+    Scope("Screen", Key{}, void() {
+        use_photos(void(Photo photo) {
+            photos++;
+            String_clear(&last);
+            if (photo.status == PhotoReady) { String_format(&last, "%dx%d %s", photo.width, photo.height, photo.path); }
+            else if (photo.status == PhotoCancelled) { String_from(&last, "cancelled"); }
+            else if (photo.status == PhotoDenied) { String_from(&last, "denied"); }
+            else if (photo.status == PhotoUnavailable) { String_from(&last, "unavailable"); }
+            else { String_from(&last, "failed"); }
+        });
+        CameraView(Style{width: 300, height: 400}, false);
+    });
+}
+
+int main() {
+    Ui runtime;
+    ui_init(&runtime, void(*uint8 data, int len) {
+        List<Mutation> items;
+        ui_decode(data, len, &items);
+        for (i in 0..items.size) {
+            // A NativeView is created with the type it shows.
+            if (items.data[i].op == 1 && items.data[i].kind == 13) { native_views++; }
+        }
+        items.free();
+        ui_complete(ui.sequence);
+    });
+    mounted = signal_new<int>(1);
+    ui_mount(void() {
+        if (mounted.get() > 0) { Screen(); }
+    });
+    ui_frame();
+    check(native_views == 1, "CameraView is a native view");
+
+    camera_pick_photo();
+    camera_take_photo();
+    camera_capture();
+    check(picks == 1 && takes == 1 && captures == 1, "each call reaches the platform");
+
+    ui_event_native("camera", "photo 1536 2048 /data/user/0/app/cache/photo-1.jpg");
+    ui_frame();
+    check(String_eq_cstr(&last, "1536x2048 /data/user/0/app/cache/photo-1.jpg") == 1, "a photo");
+    ui_event_native("camera", "photo 640 480 /Users/me/Library/Caches/My Photos/a b.jpg");
+    ui_frame();
+    check(String_eq_cstr(&last, "640x480 /Users/me/Library/Caches/My Photos/a b.jpg") == 1, "a path with spaces");
+    ui_event_native("camera", "photo 10 10 blob:http://localhost:8765/3f2a");
+    ui_frame();
+    check(String_eq_cstr(&last, "10x10 blob:http://localhost:8765/3f2a") == 1, "a blob: URL");
+
+    ui_event_native("camera", "cancelled"); ui_frame();
+    check(String_eq_cstr(&last, "cancelled") == 1, "cancelled");
+    ui_event_native("camera", "denied"); ui_frame();
+    check(String_eq_cstr(&last, "denied") == 1, "denied");
+    ui_event_native("camera", "unavailable"); ui_frame();
+    check(String_eq_cstr(&last, "unavailable") == 1, "unavailable");
+    ui_event_native("camera", "photo 12 x /a.jpg"); ui_frame();
+    check(String_eq_cstr(&last, "failed") == 1, "a malformed message fails");
+
+    int before = photos;
+    mounted.set(0);
+    ui_frame();
+    ui_event_native("camera", "photo 1 1 /x.jpg");
+    ui_frame();
+    check(photos == before, "no handler once unmounted");
+    ui_shutdown();
+    mounted.free();
+    String_free(&last);
+    printf("PASS camera\n");
+    return 0;
+}

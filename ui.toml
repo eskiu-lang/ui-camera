@@ -1,0 +1,10 @@
+# What an app that depends on this package gets. An app's own ui.toml wins for the same key,
+# so it can say in its own words why it uses the camera.
+[ios]
+frameworks = ["AVFoundation", "PhotosUI"]
+
+[ios.plist]
+NSCameraUsageDescription = "Takes photos"
+
+[android]
+permissions = ["android.permission.CAMERA"]

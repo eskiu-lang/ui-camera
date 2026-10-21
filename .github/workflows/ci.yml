@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Eskiu
+        # Straight from the release, as install.sh does (the site can refuse CI runners).
+        run: |
+          mkdir -p $HOME/.eskiu
+          curl -fsSL https://github.com/eskiu-lang/eskiu/releases/latest/download/eskiuc-linux-x86_64.tar.gz | tar -xz -C $HOME/.eskiu
+          echo "$HOME/.eskiu/bin" >> $GITHUB_PATH
+      - name: Tests
+        run: eskiuc test
+      - name: Tests (-O2)
+        run: eskiuc test -O2
+      - name: The example type-checks
+        run: cd examples/snap && eskiuc fetch && eskiuc src/main.esk --test-typechecker
+
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Eskiu
+        run: brew install eskiu-lang/eskiu/eskiu
+      - name: Tests
+        run: eskiuc test
+      - name: The example type-checks
+        run: cd examples/snap && eskiuc fetch && eskiuc src/main.esk --test-typechecker

@@ -1,0 +1,81 @@
+// <camera>: photos for apps on eskiu-lang/ui. An app picks one from the photo library, takes
+// one with the system's camera, or shows the camera live in a CameraView and captures what it
+// shows. Each photo comes back as a JPEG file the app can show with Image: upright, at most
+// 2048 pixels on its longer side, in the app's cache directory (a blob: URL on the web).
+import <string>;
+import <ui>;
+
+enum PhotoStatus { PhotoReady, PhotoCancelled, PhotoDenied, PhotoUnavailable, PhotoFailed }
+
+// A photo, or why there is none. `path` is the file (borrowed for the handler's call: copy it
+// to keep it), `width` and `height` its size in pixels.
+struct Photo { int status; string path; int width; int height; }
+
+// The platform's side (native/ios, native/android, native/web). Results come back on the
+// "camera" channel: "photo WIDTH HEIGHT PATH", "cancelled", "denied", "unavailable" or
+// "failed".
+extern void camera_native_pick();
+extern void camera_native_take();
+extern void camera_native_capture();
+
+// A message on the "camera" channel as a Photo. Its path points into `payload`.
+Photo camera_read(string payload) {
+    Photo photo = Photo{status: PhotoFailed};
+    if (payload == null) { return photo; }
+    if (strcmp(payload, "cancelled") == 0) { photo.status = PhotoCancelled; return photo; }
+    if (strcmp(payload, "denied") == 0) { photo.status = PhotoDenied; return photo; }
+    if (strcmp(payload, "unavailable") == 0) { photo.status = PhotoUnavailable; return photo; }
+    if (strncmp(payload, "photo ", 6) != 0) { return photo; }
+    // "photo W H PATH": the path is the rest, spaces and all.
+    int at = 6;
+    int width = 0;
+    while (payload[at] >= '0' && payload[at] <= '9') { width = width * 10 + (payload[at] - '0'); at++; }
+    if (payload[at] != ' ') { return photo; }
+    at++;
+    int height = 0;
+    while (payload[at] >= '0' && payload[at] <= '9') { height = height * 10 + (payload[at] - '0'); at++; }
+    if (payload[at] != ' ' || payload[at + 1] == 0) { return photo; }
+    photo.status = PhotoReady;
+    photo.width = width;
+    photo.height = height;
+    photo.path = &payload[at + 1];
+    return photo;
+}
+
+// The latest render's handler, kept in the hook's slot.
+struct PhotoHandler { fn(Photo)->void handler; }
+
+void camera_release_handler(escaping fn(Photo)->void handler) { free_closure(handler); }
+
+// `on_photo` gets each photo (or failure) the camera, the picker or a capture hands back while
+// the scope is mounted. Mount one per screen: every mounted handler gets every photo.
+void use_photos(escaping fn(Photo)->void on_photo) {
+    static int tag;
+    *Slot slot = ui_slot(10, &tag);
+    *PhotoHandler held = (*PhotoHandler)slot.data;
+    if (held == null) {
+        held = alloc<PhotoHandler>(1);
+        slot.data = held;
+        slot.dispose = void() { camera_release_handler(held.handler); free(held); };
+    } else { camera_release_handler(held.handler); }
+    held.handler = on_photo;
+    use_native_event("camera", void(string payload) { held.handler(camera_read(payload)); });
+}
+
+// The system's photo picker: the user chooses one photo, or cancels.
+void camera_pick_photo() { camera_native_pick(); }
+
+// The system's camera: the user takes one photo, or cancels. PhotoUnavailable where there is
+// no camera (a simulator, a desktop browser falls back to choosing a file).
+void camera_take_photo() { camera_native_take(); }
+
+// What the mounted CameraView shows now, as a photo.
+void camera_capture() { camera_native_capture(); }
+
+// The camera, live, filling the box the layout gives it (cropped to it): the back camera, or
+// the front one when `front`. The first one mounted asks for the camera permission;
+// use_photos gets PhotoDenied or PhotoUnavailable when it cannot show it.
+void CameraView(Style style, bool front) {
+    ui_native_prop("facing", front ? "front" : "back");
+    NativeView(style, "camera", void(string name, string payload) {});
+}

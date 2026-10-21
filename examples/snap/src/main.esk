@@ -1,0 +1,10 @@
+// Snap: the camera live, the system's camera and photo library, and the photos taken.
+// `ui run android` (or ios, web).
+import "snap.esk";
+
+void ui_app_start(int which) {
+    snap_shots = signal_new<int>(0);
+    ui_mount(void() { Snap(); });
+}
+
+void ui_app_stop() { snap_shots.free(); }
