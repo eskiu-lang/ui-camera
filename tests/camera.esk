@@ -29,7 +29,7 @@ void check(bool ok, string what) {
 *Signal<int> mounted;
 
 void Screen() {
-    Scope("Screen", Key{}, void() {
+    Scope("Screen", Key{}) {
         use_photos(void(Photo photo) {
             photos++;
             String_clear(&last);
@@ -40,7 +40,7 @@ void Screen() {
             else { String_from(&last, "failed"); }
         });
         CameraView(Style{width: 300, height: 400}, false);
-    });
+    }
 }
 
 int main() {
@@ -56,9 +56,9 @@ int main() {
         ui_complete(ui.sequence);
     });
     mounted = signal_new<int>(1);
-    ui_mount(void() {
+    ui_mount() {
         if (mounted.get() > 0) { Screen(); }
-    });
+    }
     ui_frame();
     check(native_views == 1, "CameraView is a native view");
 

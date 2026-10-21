@@ -4,7 +4,7 @@ import "snap.esk";
 
 void ui_app_start(int which) {
     snap_shots = signal_new<int>(0);
-    ui_mount(void() { Snap(); });
+    ui_mount() { Snap(); }
 }
 
 void ui_app_stop() { snap_shots.free(); }

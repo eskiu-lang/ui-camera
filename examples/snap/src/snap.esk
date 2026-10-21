@@ -30,57 +30,57 @@ string snap_problem(int status) {
 }
 
 void CameraCard(*Signal<bool> front, *Signal<int> problem) {
-    Column(Style{aspect_ratio: 0.75, radius: 28, background: ink(), shadow: 12, gap: 0}, void() {
+    Column(Style{aspect_ratio: 0.75, radius: 28, background: ink(), shadow: 12, gap: 0}) {
         // The card is raised, so on iOS it does not clip: its children round their own corners.
         CameraView(Style{absolute: true, left: 0, top: 0, right: 0, bottom: 0, radius: 28}, front.get());
         if (problem.get() >= 0) {
             Column(Style{absolute: true, left: 0, top: 0, right: 0, bottom: 0, padding: 28, gap: 8, justify: JustifyCenter,
-                         align: AlignCenter, radius: 28, background: ink()}, void() {
+                         align: AlignCenter, radius: 28, background: ink()}) {
                 TextWith(Style{font_size: 40}, "📷");
                 TextWith(Style{font_size: 17, font_weight: 700, color: white()}, "No camera here");
                 TextWith(Style{font_size: 15, color: rgba(255, 255, 255, 190)}, snap_problem(problem.get()));
-            });
+            }
         }
         // The controls over the bottom of the preview.
-        Row(Style{absolute: true, left: 0, right: 0, bottom: 20, justify: JustifyCenter, align: AlignCenter, gap: 36}, void() {
-            Row(Style{width: 48, height: 48}, void() {});
+        Row(Style{absolute: true, left: 0, right: 0, bottom: 20, justify: JustifyCenter, align: AlignCenter, gap: 36}) {
+            Row(Style{width: 48, height: 48}) {}
             Pressable(Style{width: 76, height: 76, radius: 38, background: rgba(255, 255, 255, 90), align: AlignCenter,
                             justify: JustifyCenter, label: "Take a photo"}, void() {
                 camera_capture();
                 ui_haptic(HapticLight);
-            }, void() {
-                Row(Style{width: 62, height: 62, radius: 31, background: white()}, void() {});
-            });
+            }) {
+                Row(Style{width: 62, height: 62, radius: 31, background: white()}) {}
+            }
             Pressable(Style{width: 48, height: 48, radius: 24, background: rgba(255, 255, 255, 60), align: AlignCenter,
-                            justify: JustifyCenter, label: "Switch camera"}, void() { front.set(!front.get()); }, void() {
+                            justify: JustifyCenter, label: "Switch camera"}, void() { front.set(!front.get()); }) {
                 TextWith(Style{font_size: 20, color: white()}, "⟲");
-            });
-        });
-    });
+            }
+        }
+    }
 }
 
 void Recent() {
     int count = snap_shots.get();
-    Row(Style{align: AlignCenter}, void() {
+    Row(Style{align: AlignCenter}) {
         TextWith(Style{grow: 1, font_size: 20, font_weight: 700, color: ink()}, "Recent");
         String text;
         defer String_free(&text);
         String_format(&text, count == 1 ? "%d photo" : "%d photos", count);
         TextWith(Style{font_size: 15, color: muted()}, text.data);
-    });
+    }
     if (count == 0) {
         TextWith(Style{font_size: 15, color: muted()}, "Photos you take or choose show up here.");
         return;
     }
-    Row(Style{wrap: true, gap: 8}, void() {
+    Row(Style{wrap: true, gap: 8}) {
         for (int i = count - 1; i >= 0 && i >= count - 9; i--) {
             Image(Style{key: key(i), width: 108, height: 108, radius: 14, cover: true, label: "A photo"}, snap_paths.data[i].data);
         }
-    });
+    }
 }
 
 void Snap() {
-    Column(Style{grow: 1, background: page(), gap: 0}, void() {
+    Column(Style{grow: 1, background: page(), gap: 0}) {
         StatusBar(BarDark, false);
         *Signal<bool> front = use_signal<bool>(false);
         // -1 while the camera shows, else the PhotoStatus that keeps it from showing.
@@ -90,22 +90,22 @@ void Snap() {
             else if (photo.status == PhotoDenied || photo.status == PhotoUnavailable) { problem.set(photo.status); }
             else if (photo.status == PhotoFailed) { kit_toast("That photo could not be read"); }
         });
-        Scroll(Style{grow: 1, padding: 20, gap: 18}, void() {
-            Column(Style{gap: 2}, void() {
+        Scroll(Style{grow: 1, padding: 20, gap: 18}) {
+            Column(Style{gap: 2}) {
                 TextWith(Style{font_size: 15, color: muted()}, "Camera");
                 TextWith(Style{font_size: 34, font_weight: 800, color: ink()}, "Snap");
-            });
+            }
             CameraCard(front, problem);
-            Row(Style{gap: 12}, void() {
-                Column(Style{width: 1, grow: 1, gap: 0}, void() {
-                    KitButton("Library", VariantSecondary, void() { camera_pick_photo(); });
-                });
-                Column(Style{width: 1, grow: 1, gap: 0}, void() {
-                    KitButton("Camera app", VariantPrimary, void() { camera_take_photo(); });
-                });
-            });
+            Row(Style{gap: 12}) {
+                Column(Style{width: 1, grow: 1, gap: 0}) {
+                    KitButton("Library", VariantSecondary) { camera_pick_photo(); }
+                }
+                Column(Style{width: 1, grow: 1, gap: 0}) {
+                    KitButton("Camera app", VariantPrimary) { camera_take_photo(); }
+                }
+            }
             Recent();
-        });
+        }
         ToastHost();
-    });
+    }
 }

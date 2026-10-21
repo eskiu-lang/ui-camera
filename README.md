@@ -54,7 +54,7 @@ import <camera>;
 List<String> photos;
 
 void Shoot() {
-    Column(Style{padding: 20, gap: 12}, void() {
+    Column(Style{padding: 20, gap: 12}) {
         use_photos(void(Photo photo) {
             if (photo.status != PhotoReady) { return; }
             String path;
@@ -62,9 +62,9 @@ void Shoot() {
             photos.push(path);
         });
         CameraView(Style{height: 360, radius: 20}, false);
-        Button("Take a photo", void() { camera_capture(); });
-        Button("Choose from the library", void() { camera_pick_photo(); });
-    });
+        Button("Take a photo") { camera_capture(); }
+        Button("Choose from the library") { camera_pick_photo(); }
+    }
 }
 ```
 
