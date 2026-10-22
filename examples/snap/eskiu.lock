@@ -1,4 +1,4 @@
 # eskiu.lock: written by eskiuc (eskiuc fetch updates it); do not edit.
 camera	path	../..
 snap	root	.
-ui	git	https://github.com/eskiu-lang/ui	v0.1.1	1f7bbcb52e0e7f9e3e4956d9666e2a55aacc3ef1
+ui	git	https://github.com/eskiu-lang/ui	v0.1.1	9b6c2aa6bc89fef4e84f1f1d9cb4573ffba2de8e
