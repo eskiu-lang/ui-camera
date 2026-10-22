@@ -32,7 +32,7 @@ live in a `CameraView` and captures what it shows. Each photo comes back as a JP
 In an app made with `ui new`:
 
 ```bash
-eskiuc add camera --git https://github.com/eskiu-lang/ui-camera --rev v0.1.0
+eskiuc add camera --git https://github.com/eskiu-lang/ui-camera --rev v0.1.1
 ```
 
 Its `ui.toml` brings AVFoundation and PhotosUI with a camera usage text on iOS, and the camera
