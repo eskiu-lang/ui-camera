@@ -14,7 +14,7 @@
 
 <p align="center">
   <a href="https://github.com/eskiu-lang/ui-camera/actions/workflows/ci.yml"><img src="https://github.com/eskiu-lang/ui-camera/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/version-0.1.0-6448d4" alt="Version 0.1.0">
+  <img src="https://img.shields.io/badge/version-0.1.2-6448d4" alt="Version 0.1.2">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
 </p>
 
@@ -32,7 +32,7 @@ live in a `CameraView` and captures what it shows. Each photo comes back as a JP
 In an app made with `ui new`:
 
 ```bash
-eskiuc add camera --git https://github.com/eskiu-lang/ui-camera --rev v0.1.1
+eskiuc add camera --git https://github.com/eskiu-lang/ui-camera --rev v0.1.2
 ```
 
 Its `ui.toml` brings AVFoundation and PhotosUI with a camera usage text on iOS, and the camera
