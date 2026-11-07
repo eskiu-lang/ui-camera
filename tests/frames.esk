@@ -1,0 +1,323 @@
+// <camera>'s live frames with no device: the YUV to RGB conversion against the reference
+// formula in doubles, the checks on what the platform lends, each layout turned upright, and
+// use_camera_frames against stand-ins that lend a frame. Each check that fails exits with 1.
+import <io>;
+import <math>;
+import <ui>;
+import <camera>;
+
+void camera_native_pick() {}
+
+void camera_native_take() {}
+
+void camera_native_capture() {}
+
+int frames_on = -1;
+int asked_width;
+int asked_height;
+int asked_fps;
+int frame_calls;
+int acquires;
+int releases;
+int64[CAMERA_FRAME_INFO] lent;
+bool lend;
+
+void camera_native_frames(int on, int width, int height, int fps) {
+    frame_calls++;
+    frames_on = on;
+    asked_width = width;
+    asked_height = height;
+    asked_fps = fps;
+}
+
+int camera_native_frame_acquire(*int64 info) {
+    acquires++;
+    if (!lend) { return 0; }
+    for (i in 0..CAMERA_FRAME_INFO) { info[i] = lent[i]; }
+    return 1;
+}
+
+void camera_native_frame_release() { releases++; }
+
+void check(bool ok, string what) {
+    if (!ok) {
+        printf("FAIL %s\n", what);
+        exit(1);
+    }
+}
+
+// The reference: R, G and B in doubles from the matrix's Kr and Kb, rounded and clamped.
+int reference(int matrix, bool full, int y, int u, int v, int channel) {
+    double kr = matrix == CameraBT709 ? 0.2126 : 0.299;
+    double kb = matrix == CameraBT709 ? 0.0722 : 0.114;
+    double kg = 1.0 - kr - kb;
+    double yy = (double)y;
+    double cb = (double)(u - 128);
+    double cr = (double)(v - 128);
+    if (!full) {
+        yy = (yy - 16.0) * 255.0 / 219.0;
+        cb = cb * 255.0 / 224.0;
+        cr = cr * 255.0 / 224.0;
+    }
+    double value = yy + 2.0 * (1.0 - kr) * cr;
+    if (channel == 1) { value = yy - 2.0 * kb * (1.0 - kb) / kg * cb - 2.0 * kr * (1.0 - kr) / kg * cr; }
+    if (channel == 2) { value = yy + 2.0 * (1.0 - kb) * cb; }
+    int rounded = (int)floor(value + 0.5);
+    if (rounded < 0) { return 0; }
+    if (rounded > 255) { return 255; }
+    return rounded;
+}
+
+int distance(int a, int b) { return a > b ? a - b : b - a; }
+
+void conversion() {
+    uint8[3] rgb;
+    for (m in 0..2) {
+        for (f in 0..2) {
+            bool full = f == 1;
+            CameraYuvCoeffs c = camera_yuv_coeffs(m, full);
+            int worst = 0;
+            for (int y = 0; y < 256; y += 5) {
+                for (int u = 0; u < 256; u += 5) {
+                    for (int v = 0; v < 256; v += 5) {
+                        camera_yuv_to_rgb(&c, y, u, v, &rgb[0]);
+                        for (ch in 0..3) {
+                            int d = distance(rgb[ch], reference(m, full, y, u, v, ch));
+                            if (d > worst) { worst = d; }
+                        }
+                    }
+                }
+            }
+            check(worst <= 1, "fixed point within 1 of the reference formula");
+        }
+    }
+    // Known values: gray, limited black and white, and the BT.601 / BT.709 limited reds.
+    CameraYuvCoeffs full601 = camera_yuv_coeffs(CameraBT601, true);
+    camera_yuv_to_rgb(&full601, 128, 128, 128, &rgb[0]);
+    check(rgb[0] == 128 && rgb[1] == 128 && rgb[2] == 128, "full-range gray");
+    CameraYuvCoeffs lim601 = camera_yuv_coeffs(CameraBT601, false);
+    camera_yuv_to_rgb(&lim601, 16, 128, 128, &rgb[0]);
+    check(rgb[0] == 0 && rgb[1] == 0 && rgb[2] == 0, "limited black");
+    camera_yuv_to_rgb(&lim601, 235, 128, 128, &rgb[0]);
+    check(rgb[0] == 255 && rgb[1] == 255 && rgb[2] == 255, "limited white");
+    camera_yuv_to_rgb(&lim601, 81, 90, 240, &rgb[0]);
+    check(rgb[0] >= 254 && rgb[1] <= 1 && rgb[2] <= 1, "BT.601 limited red");
+    CameraYuvCoeffs lim709 = camera_yuv_coeffs(CameraBT709, false);
+    camera_yuv_to_rgb(&lim709, 63, 102, 240, &rgb[0]);
+    check(rgb[0] >= 254 && rgb[1] <= 1 && rgb[2] <= 2, "BT.709 limited red");
+    CameraYuvCoeffs full709 = camera_yuv_coeffs(CameraBT709, true);
+    camera_yuv_to_rgb(&full709, 54, 99, 256 - 1, &rgb[0]);
+    check(rgb[0] >= 253 && rgb[1] <= 2, "BT.709 full red");
+}
+
+// A 4 x 2 test image: Y rises left to right, the two chroma blocks differ.
+uint8[16] luma = {10, 60, 110, 160, 20, 70, 120, 170, 0, 0, 0, 0, 0, 0, 0, 0};
+int[2] block_u = {90, 200};
+int[2] block_v = {240, 60};
+
+// The expected RGB for (x, y) of the test image.
+void expected(int x, int y, *uint8 rgb) {
+    CameraYuvCoeffs c = camera_yuv_coeffs(CameraBT601, true);
+    camera_yuv_to_rgb(&c, luma[y * 4 + x], block_u[x / 2], block_v[x / 2], rgb);
+}
+
+// Fills `info` for the test image with the given format and planes.
+void describe(*int64 info, int format, int count, int rotation) {
+    for (i in 0..CAMERA_FRAME_INFO) { info[i] = 0; }
+    info[0] = 4; info[1] = 2; info[2] = format; info[3] = count; info[4] = rotation;
+    info[6] = CameraBT601; info[7] = 1; info[8] = 123456789;
+}
+
+void plane(*int64 info, int i, *uint8 data, int row, int pixel, int64 size) {
+    info[9 + i * 4] = (int64)data;
+    info[10 + i * 4] = row;
+    info[11 + i * 4] = pixel;
+    info[12 + i * 4] = size;
+}
+
+// `frame` converted (turned when `upright`) matches the test image pixel by pixel.
+void matches(*CameraFrame frame, bool upright, string what) {
+    uint8[128] out;
+    int w = frame.out_width(upright);
+    int h = frame.out_height(upright);
+    frame.to_rgba(&out[0], w * 4, upright);
+    uint8[3] rgb;
+    for (y in 0..2) {
+        for (x in 0..4) {
+            int dx = x;
+            int dy = y;
+            int turn = upright ? frame.rotation : 0;
+            if (turn == 90) { dx = 1 - y; dy = x; }
+            else if (turn == 180) { dx = 3 - x; dy = 1 - y; }
+            else if (turn == 270) { dx = y; dy = 3 - x; }
+            expected(x, y, &rgb[0]);
+            *uint8 px = &out[dy * w * 4 + dx * 4];
+            check(px[0] == rgb[0] && px[1] == rgb[1] && px[2] == rgb[2] && px[3] == 255, what);
+        }
+    }
+}
+
+void layouts() {
+    int64[CAMERA_FRAME_INFO] info;
+    CameraFrame frame;
+    // NV12 with padded rows (stride 6), and NV21.
+    uint8[12] y12 = {10, 60, 110, 160, 0, 0, 20, 70, 120, 170, 0, 0};
+    uint8[6] uv = {90, 240, 200, 60, 0, 0};
+    describe(&info[0], CameraNV12, 2, 0);
+    plane(&info[0], 0, &y12[0], 6, 1, 12);
+    plane(&info[0], 1, &uv[0], 6, 2, 4);
+    check(camera_frame_read(&info[0], &frame), "NV12 reads");
+    check(frame.width == 4 && frame.height == 2 && frame.timestamp_ns == 123456789 && frame.full_range, "NV12 fields");
+    matches(&frame, false, "NV12 pixels");
+    for (r in 0..4) {
+        info[4] = r * 90;
+        check(camera_frame_read(&info[0], &frame), "NV12 turned reads");
+        check(frame.out_width(true) == (r % 2 == 1 ? 2 : 4), "upright width");
+        matches(&frame, true, "NV12 turned upright");
+    }
+    info[4] = 45;
+    check(!camera_frame_read(&info[0], &frame), "a rotation of 45 is refused");
+    info[4] = 0;
+    info[12 + 4] = 3;
+    check(!camera_frame_read(&info[0], &frame), "a chroma plane too short is refused");
+    info[12 + 4] = 4;
+    info[12] = 9;
+    check(!camera_frame_read(&info[0], &frame), "a luma plane too short is refused");
+    info[12] = 12;
+    info[9] = 0;
+    check(!camera_frame_read(&info[0], &frame), "a missing plane is refused");
+    info[9] = (int64)&y12[0];
+    info[10] = 3;
+    check(!camera_frame_read(&info[0], &frame), "a row stride under the width is refused");
+    info[10] = 6;
+    info[3] = 3;
+    check(!camera_frame_read(&info[0], &frame), "a plane count that does not fit the format is refused");
+    info[3] = 2;
+    info[2] = 9;
+    check(!camera_frame_read(&info[0], &frame), "an unknown format is refused");
+    info[2] = CameraNV12;
+    info[0] = 0;
+    check(!camera_frame_read(&info[0], &frame), "a zero width is refused");
+    info[0] = 4;
+
+    uint8[4] vu = {240, 90, 60, 200};
+    describe(&info[0], CameraNV21, 2, 0);
+    plane(&info[0], 0, &y12[0], 6, 1, 12);
+    plane(&info[0], 1, &vu[0], 4, 2, 4);
+    check(camera_frame_read(&info[0], &frame), "NV21 reads");
+    matches(&frame, false, "NV21 pixels");
+
+    // I420, then Android's general layout: separate U and V planes, samples 2 bytes apart.
+    uint8[2] u = {90, 200};
+    uint8[2] v = {240, 60};
+    describe(&info[0], CameraI420, 3, 0);
+    plane(&info[0], 0, &luma[0], 4, 1, 8);
+    plane(&info[0], 1, &u[0], 2, 1, 2);
+    plane(&info[0], 2, &v[0], 2, 1, 2);
+    check(camera_frame_read(&info[0], &frame), "I420 reads");
+    matches(&frame, false, "I420 pixels");
+    uint8[3] u2 = {90, 0, 200};
+    uint8[3] v2 = {240, 0, 60};
+    describe(&info[0], CameraYUV420, 3, 0);
+    plane(&info[0], 0, &luma[0], 4, 1, 8);
+    plane(&info[0], 1, &u2[0], 4, 2, 3);
+    plane(&info[0], 2, &v2[0], 4, 2, 3);
+    check(camera_frame_read(&info[0], &frame), "YUV420 reads");
+    matches(&frame, false, "YUV420 pixels");
+    info[12 + 8] = 2;
+    check(!camera_frame_read(&info[0], &frame), "a V plane too short is refused");
+
+    // RGBA, the web's, is copied.
+    uint8[32] rgba;
+    for (i in 0..8) {
+        expected(i % 4, i / 4, &rgba[i * 4]);
+        rgba[i * 4 + 3] = 255;
+    }
+    describe(&info[0], CameraRGBA, 1, 90);
+    plane(&info[0], 0, &rgba[0], 16, 4, 32);
+    check(camera_frame_read(&info[0], &frame), "RGBA reads");
+    matches(&frame, true, "RGBA turned upright");
+    info[12] = 31;
+    check(!camera_frame_read(&info[0], &frame), "an RGBA plane too short is refused");
+}
+
+*Signal<int> mounted;
+*Signal<int> fps;
+int seen;
+int seen_width;
+int first_pixel;
+
+void Screen() {
+    Scope("Screen", Key{}) {
+        use_camera_frames(CameraFrameOptions{width: 640, height: 480, fps: fps.get()}, void(*CameraFrame frame) {
+            seen++;
+            seen_width = frame.width;
+            uint8[32] out;
+            frame.to_rgba(&out[0], 16, false);
+            first_pixel = out[0];
+        });
+        CameraView(Style{width: 300, height: 400}, false);
+    }
+}
+
+void hook() {
+    Ui runtime;
+    ui_init(&runtime, void(*uint8 data, int len) { ui_complete(ui.sequence); });
+    mounted = signal_new<int>(1);
+    fps = signal_new<int>(15);
+    ui_mount() {
+        if (mounted.get() > 0) { Screen(); }
+    }
+    ui_frame();
+    check(frames_on == 1 && asked_width == 640 && asked_height == 480 && asked_fps == 15, "mounting turns frames on");
+
+    uint8[12] y12 = {10, 60, 110, 160, 0, 0, 20, 70, 120, 170, 0, 0};
+    uint8[4] uv = {90, 240, 200, 60};
+    describe(&lent[0], CameraNV12, 2, 90);
+    plane(&lent[0], 0, &y12[0], 6, 1, 12);
+    plane(&lent[0], 1, &uv[0], 4, 2, 4);
+    lend = true;
+    ui_event_native("camera_frame", "frame");
+    ui_frame();
+    uint8[3] rgb;
+    expected(0, 0, &rgb[0]);
+    check(seen == 1 && seen_width == 4 && first_pixel == rgb[0], "a frame reaches the handler");
+    check(acquires == 1 && releases == 1, "the frame is given back after the call");
+
+    lend = false;
+    ui_event_native("camera_frame", "frame");
+    ui_frame();
+    check(seen == 1 && acquires == 2 && releases == 1, "no frame waiting: no call, nothing to give back");
+
+    lend = true;
+    lent[4] = 33;
+    ui_event_native("camera_frame", "frame");
+    ui_frame();
+    check(seen == 1 && releases == 2, "a frame that does not check out is given back unseen");
+    lent[4] = 0;
+
+    int calls = frame_calls;
+    fps.set(30);
+    ui_frame();
+    check(frame_calls == calls + 1 && frames_on == 1 && asked_fps == 30, "new options are applied");
+    ui_frame();
+    check(frame_calls == calls + 1, "the same options are not sent again");
+
+    mounted.set(0);
+    ui_frame();
+    check(frames_on == 0, "unmounting turns frames off");
+    ui_event_native("camera_frame", "frame");
+    ui_frame();
+    check(seen == 1, "no handler once unmounted");
+    ui_shutdown();
+    mounted.free();
+    fps.free();
+}
+
+int main() {
+    conversion();
+    layouts();
+    hook();
+    printf("PASS frames\n");
+    return 0;
+}

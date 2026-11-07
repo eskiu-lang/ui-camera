@@ -15,6 +15,12 @@ void camera_native_take() { takes++; }
 
 void camera_native_capture() { captures++; }
 
+void camera_native_frames(int on, int width, int height, int fps) {}
+
+int camera_native_frame_acquire(*int64 info) { return 0; }
+
+void camera_native_frame_release() {}
+
 String last;
 int photos;
 int native_views;
