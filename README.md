@@ -74,6 +74,7 @@ void Shoot() {
 | `camera_take_photo()` | The system's camera app. |
 | `CameraView(Style, bool front)` | The camera, live, filling its box (cropped): the back camera, or the front one. The first one mounted asks for the camera permission. |
 | `camera_capture()` | What the mounted `CameraView` shows now, as a photo. |
+| `use_camera_frames(CameraFrameOptions, fn(*CameraFrame))` | The `CameraView`'s live frames, borrowed by pointer for the call: YUV planes (RGBA on the web), newest frame wins. See [Live frames](docs/frames.md). |
 
 ## Platforms
 
@@ -100,7 +101,9 @@ ui run android    # or ios, web
 
 `eskiuc test` runs `tests/camera.esk` on this computer, with stand-ins for the platform's side:
 each call reaching it, photos with paths that have spaces and with `blob:` URLs, each failure,
-a malformed message, and no handler after the screen unmounts.
+a malformed message, and no handler after the screen unmounts. `tests/frames.esk` checks the
+YUV to RGB conversion against the reference formulas, each frame layout turned upright, and
+`use_camera_frames` against a stand-in that lends frames.
 
 ## Documentation
 

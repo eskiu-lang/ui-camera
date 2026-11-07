@@ -98,3 +98,184 @@ void CameraView(Style style, bool front)
 The camera, live, filling the box the layout gives it (cropped to it): the back camera, or
 the front one when `front`. The first one mounted asks for the camera permission;
 use_photos gets PhotoDenied or PhotoUnavailable when it cannot show it.
+
+### CameraFormat
+
+```eskiu
+enum CameraFormat { CameraNV12, CameraNV21, CameraI420, CameraYUV420, CameraRGBA }
+```
+
+How a frame's pixels are laid out. NV12: a Y plane, then one plane of interleaved U and V
+(U first). NV21: the same with V first. I420: Y, U and V planes, chroma a quarter of the
+size. YUV420: Y, U and V planes whose chroma samples are `pixel_stride` bytes apart. RGBA:
+one plane of 4 bytes a pixel (the web).
+
+### CameraMatrix
+
+```eskiu
+enum CameraMatrix { CameraBT601, CameraBT709 }
+```
+
+The matrix a frame's YUV is encoded with: BT.601 (standard definition, JPEG) or BT.709 (HD).
+
+### CameraPlane
+
+```eskiu
+struct CameraPlane { *uint8 data; int row_stride; int pixel_stride; int64 size; }
+```
+
+One plane of a frame: `data` (borrowed for the handler's call), the bytes from one row to
+the next, from one sample to the next in a row (2 in NV12 and NV21's chroma plane, from one
+U to the next), and the bytes readable from `data`.
+
+### CameraFrame
+
+```eskiu
+struct CameraFrame {
+    int width;
+    int height;
+    int format;
+    int plane_count;
+    CameraPlane[3] planes;
+    int rotation;
+    int64 timestamp_ns;
+    bool front;
+    int matrix;
+    bool full_range;
+}
+```
+
+A frame as the sensor sees it. `width` and `height` are in pixels; `plane_count` planes are
+set, as `format` says. `rotation` (0, 90, 180 or 270) is how far to turn it clockwise to be
+upright as the screen is held; `timestamp_ns` is the platform's capture time (a monotonic
+clock, for spacing frames); `front` is the front camera, whose frames are not mirrored;
+`matrix` and `full_range` say how its YUV maps to RGB.
+
+### CameraFrameOptions
+
+```eskiu
+struct CameraFrameOptions {
+    int width = 1280;
+    int height = 720;
+    int fps = 30;
+}
+```
+
+What use_camera_frames asks for: the frame size (the platform picks the nearest it has,
+landscape, as the sensor gives it) and at most `fps` frames a second.
+
+### CAMERA_FRAME_INFO
+
+```eskiu
+const int CAMERA_FRAME_INFO = 24;
+```
+
+How many int64 values camera_native_frame_acquire fills: width, height, format,
+plane_count, rotation, front, matrix, full_range, timestamp_ns, then for each of 3 planes
+its data pointer, row_stride, pixel_stride and size.
+
+### camera_frame_read
+
+```eskiu
+bool camera_frame_read(*int64 info, *CameraFrame out)
+```
+
+The values camera_native_frame_acquire filled, checked, as a frame; false when they do not
+describe one (unknown format, a missing plane, strides or sizes that do not cover the
+pixels), so a handler never reads outside a buffer.
+
+### FrameHandler
+
+```eskiu
+struct FrameHandler { fn(*CameraFrame)->void handler; CameraFrameOptions options; bool asked; }
+```
+
+The latest render's frame handler and the options it asked for, kept in the hook's slot.
+
+### camera_release_frame_handler
+
+```eskiu
+void camera_release_frame_handler(escaping fn(*CameraFrame)->void handler)
+```
+
+Frees a frame handler's closure; use_camera_frames calls it when it replaces or drops the
+handler.
+
+### camera_deliver_frame
+
+```eskiu
+void camera_deliver_frame(fn(*CameraFrame)->void handler)
+```
+
+Borrows the latest frame from the platform, hands it to `handler` and gives it back.
+
+### use_camera_frames
+
+```eskiu
+void use_camera_frames(CameraFrameOptions options, escaping fn(*CameraFrame)->void on_frame)
+```
+
+`on_frame` gets the mounted CameraView's frames while the scope is mounted, on the UI
+thread; the frame and its planes are borrowed for the call (convert or copy what you keep).
+A frame that arrives while it runs replaces the one waiting: a slow handler gets fewer,
+newer frames, never a queue. A CameraView must be mounted for frames to come (it may be
+small); new options are applied when they change.
+
+### CameraYuvCoeffs
+
+```eskiu
+struct CameraYuvCoeffs { int y_offset; int y_scale; int v_r; int u_g; int v_g; int u_b; }
+```
+
+The fixed-point (1 << 16) coefficients that turn one matrix and range's YUV into RGB.
+
+### camera_yuv_coeffs
+
+```eskiu
+CameraYuvCoeffs camera_yuv_coeffs(int matrix, bool full_range)
+```
+
+The coefficients for `matrix` (a CameraMatrix), full range (Y 0-255, chroma 0-255 about
+128) or limited (Y 16-235, chroma 16-240).
+
+### camera_clamp8
+
+```eskiu
+uint8 camera_clamp8(int value)
+```
+
+A fixed-point value rounded to 0-255.
+
+### camera_yuv_to_rgb
+
+```eskiu
+void camera_yuv_to_rgb(*CameraYuvCoeffs c, int y, int u, int v, *uint8 rgb)
+```
+
+One pixel's Y, U (Cb) and V (Cr) as R, G and B into `rgb[0..2]`.
+
+### CameraFrame_out_width
+
+```eskiu
+int CameraFrame_out_width(*CameraFrame self, bool upright)
+```
+
+The frame's width once turned upright (to_rgba with `upright`), or as it is.
+
+### CameraFrame_out_height
+
+```eskiu
+int CameraFrame_out_height(*CameraFrame self, bool upright)
+```
+
+The frame's height once turned upright, or as it is.
+
+### CameraFrame_to_rgba
+
+```eskiu
+void CameraFrame_to_rgba(*CameraFrame self, *uint8 out, int out_stride, bool upright)
+```
+
+The frame as RGBA (alpha 255) into `out`, `out_stride` bytes a row, with its own matrix
+and range; turned by its rotation when `upright` (out_width and out_height give the size
+`out` needs). Pure Eskiu, on the calling thread.
