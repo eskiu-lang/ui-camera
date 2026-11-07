@@ -17,11 +17,11 @@ import sys
 
 API_SKIP = {"raw.esk"}
 
-DECL_KW = re.compile(r"^(packed\s+)?(struct|union|interface|enum)\s+([A-Za-z]\w*)")
-TYPE_RE = re.compile(r"^type\s+([A-Za-z]\w*)\s*=")
-CONST_RE = re.compile(r"^const\s+.*?\b([A-Za-z]\w*)\s*(\[[^\]]*\])?\s*=")
+DECL_KW = re.compile(r"^(packed\s+)?(struct|union|interface|enum)\s+([A-Za-z_]\w*)")
+TYPE_RE = re.compile(r"^type\s+([A-Za-z_]\w*)\s*=")
+CONST_RE = re.compile(r"^const\s+.*?\b([A-Za-z_]\w*)\s*(\[[^\]]*\])?\s*=")
 FN_RE = re.compile(r"^(?:export\s+|must_use\s+|async\s+|deprecated\s*\([^)]*\)\s*)*"
-                   r"[\w<>,\*\[\]\s?]+?[\s\*]([A-Za-z]\w*)\s*(?:<[^>()]*>)?\s*\(")
+                   r"[\w<>,\*\[\]\s?]+?[\s\*]([A-Za-z_]\w*)\s*(?:<[^>()]*>)?\s*\(")
 OP_RE = re.compile(r"^[\w<>,\*\[\]\s]+?\boperator\s*(\S+?)\s*\(")
 
 
@@ -316,9 +316,15 @@ def build():
         for it in items:
             key = (it[0], it[1])
             if key in seen:
+                # another declaration of the name (a prototype, or a variant under #ifdef):
+                # its signature and comment are added when they differ
                 k = seen[key]
-                if not uniq[k][4] and it[4]:
-                    uniq[k] = it
+                kind, name, text, cmt, has = uniq[k]
+                if it[2] not in text:
+                    text += "\n\n" + it[2]
+                if it[3] and it[3] not in cmt:
+                    cmt = (cmt + "\n\n" + it[3]) if cmt else it[3]
+                uniq[k] = (kind, name, text, cmt, has or it[4])
                 continue
             seen[key] = len(uniq)
             uniq.append(it)
