@@ -83,3 +83,276 @@ void CameraView(Style style, bool front) {
     ui_native_prop("facing", front ? "front" : "back");
     NativeView(style, "camera", void(string name, string payload) {});
 }
+
+// Live frames: the mounted CameraView's camera, frame by frame, as the platform hands them
+// over (docs/frames.md). The pixels stay in the platform's buffer: the native side keeps the
+// latest frame, tells the "camera_frame" channel once that one is waiting, and lends it to
+// Eskiu by pointer for the length of the handler's call. A frame that arrives while the
+// handler is busy replaces the one waiting, so a slow handler sees the newest frame and the
+// others are dropped.
+
+// How a frame's pixels are laid out. NV12: a Y plane, then one plane of interleaved U and V
+// (U first). NV21: the same with V first. I420: Y, U and V planes, chroma a quarter of the
+// size. YUV420: Y, U and V planes whose chroma samples are `pixel_stride` bytes apart. RGBA:
+// one plane of 4 bytes a pixel (the web).
+enum CameraFormat { CameraNV12, CameraNV21, CameraI420, CameraYUV420, CameraRGBA }
+
+// The matrix a frame's YUV is encoded with: BT.601 (standard definition, JPEG) or BT.709 (HD).
+enum CameraMatrix { CameraBT601, CameraBT709 }
+
+// One plane of a frame: `data` (borrowed for the handler's call), the bytes from one row to
+// the next, from one sample to the next in a row (2 in NV12 and NV21's chroma plane, from one
+// U to the next), and the bytes readable from `data`.
+struct CameraPlane { *uint8 data; int row_stride; int pixel_stride; int64 size; }
+
+// A frame as the sensor sees it. `width` and `height` are in pixels; `plane_count` planes are
+// set, as `format` says. `rotation` (0, 90, 180 or 270) is how far to turn it clockwise to be
+// upright as the screen is held; `timestamp_ns` is the platform's capture time (a monotonic
+// clock, for spacing frames); `front` is the front camera, whose frames are not mirrored;
+// `matrix` and `full_range` say how its YUV maps to RGB.
+struct CameraFrame {
+    int width;
+    int height;
+    int format;
+    int plane_count;
+    CameraPlane[3] planes;
+    int rotation;
+    int64 timestamp_ns;
+    bool front;
+    int matrix;
+    bool full_range;
+}
+
+// What use_camera_frames asks for: the frame size (the platform picks the nearest it has,
+// landscape, as the sensor gives it) and at most `fps` frames a second.
+struct CameraFrameOptions {
+    int width = 1280;
+    int height = 720;
+    int fps = 30;
+}
+
+// The platform's side of frames. camera_native_frames turns them on (`on` 1, with the
+// options) or off; the live view posts "frame" on the "camera_frame" channel when a frame is
+// waiting and none was posted since the last acquire. camera_native_frame_acquire lends the
+// latest frame: it fills CAMERA_FRAME_INFO int64 values (the layout is camera_frame_read's)
+// and returns 1, or 0 when there is none; camera_native_frame_release ends the loan.
+extern void camera_native_frames(int on, int width, int height, int fps);
+extern int camera_native_frame_acquire(*int64 info);
+extern void camera_native_frame_release();
+
+// How many int64 values camera_native_frame_acquire fills: width, height, format,
+// plane_count, rotation, front, matrix, full_range, timestamp_ns, then for each of 3 planes
+// its data pointer, row_stride, pixel_stride and size.
+const int CAMERA_FRAME_INFO = 24;
+
+// The values camera_native_frame_acquire filled, checked, as a frame; false when they do not
+// describe one (unknown format, a missing plane, strides or sizes that do not cover the
+// pixels), so a handler never reads outside a buffer.
+bool camera_frame_read(*int64 info, *CameraFrame out) {
+    *out = CameraFrame{};
+    int64 width = info[0];
+    int64 height = info[1];
+    int64 format = info[2];
+    if (width <= 0 || height <= 0 || width > 16384 || height > 16384) { return false; }
+    if (format < CameraNV12 || format > CameraRGBA) { return false; }
+    out.width = (int)width;
+    out.height = (int)height;
+    out.format = (int)format;
+    out.plane_count = (int)info[3];
+    int64 rotation = info[4];
+    if (rotation != 0 && rotation != 90 && rotation != 180 && rotation != 270) { return false; }
+    out.rotation = (int)rotation;
+    out.front = info[5] != 0;
+    out.matrix = info[6] == CameraBT709 ? CameraBT709 : CameraBT601;
+    out.full_range = info[7] != 0;
+    out.timestamp_ns = info[8];
+    int want = 3;
+    if (format == CameraNV12 || format == CameraNV21) { want = 2; }
+    if (format == CameraRGBA) { want = 1; }
+    if (out.plane_count != want) { return false; }
+    for (i in 0..want) {
+        *CameraPlane plane = &out.planes[i];
+        plane.data = (*uint8)info[9 + i * 4];
+        int64 row_stride = info[10 + i * 4];
+        int64 pixel_stride = info[11 + i * 4];
+        plane.size = info[12 + i * 4];
+        if (plane.data == null || row_stride <= 0 || row_stride > 1 << 20) { return false; }
+        if (pixel_stride <= 0 || pixel_stride > 8) { return false; }
+        plane.row_stride = (int)row_stride;
+        plane.pixel_stride = (int)pixel_stride;
+        int rows = out.height;
+        int samples = out.width;
+        if (i > 0) {
+            rows = (out.height + 1) / 2;
+            samples = (out.width + 1) / 2;
+        }
+        // The bytes a row's last sample takes: an interleaved chroma pair's second byte, or
+        // an RGBA pixel's four.
+        int tail = 1;
+        if (want == 2 && i == 1) { tail = 2; }
+        if (format == CameraRGBA) { tail = 4; }
+        if (plane.pixel_stride < tail && format == CameraRGBA) { return false; }
+        if (want == 2 && i == 1 && plane.pixel_stride < 2) { return false; }
+        int64 row_bytes = (int64)(samples - 1) * plane.pixel_stride + tail;
+        if ((int64)plane.row_stride < row_bytes) { return false; }
+        int64 need = (int64)(rows - 1) * plane.row_stride + row_bytes;
+        if (plane.size < need) { return false; }
+    }
+    return true;
+}
+
+// The latest render's frame handler and the options it asked for, kept in the hook's slot.
+struct FrameHandler { fn(*CameraFrame)->void handler; CameraFrameOptions options; bool asked; }
+
+// How many use_camera_frames scopes are mounted: the first turns frames on, the last off.
+int camera_frame_users;
+
+// Frees a frame handler's closure; use_camera_frames calls it when it replaces or drops the
+// handler.
+void camera_release_frame_handler(escaping fn(*CameraFrame)->void handler) { free_closure(handler); }
+
+// Borrows the latest frame from the platform, hands it to `handler` and gives it back.
+void camera_deliver_frame(fn(*CameraFrame)->void handler) {
+    int64[CAMERA_FRAME_INFO] info;
+    if (camera_native_frame_acquire(&info[0]) == 0) { return; }
+    CameraFrame frame;
+    if (camera_frame_read(&info[0], &frame)) { handler(&frame); }
+    camera_native_frame_release();
+}
+
+// `on_frame` gets the mounted CameraView's frames while the scope is mounted, on the UI
+// thread; the frame and its planes are borrowed for the call (convert or copy what you keep).
+// A frame that arrives while it runs replaces the one waiting: a slow handler gets fewer,
+// newer frames, never a queue. A CameraView must be mounted for frames to come (it may be
+// small); new options are applied when they change.
+void use_camera_frames(CameraFrameOptions options, escaping fn(*CameraFrame)->void on_frame) {
+    static int tag;
+    *Slot slot = ui_slot(10, &tag);
+    *FrameHandler held = (*FrameHandler)slot.data;
+    if (held == null) {
+        held = alloc<FrameHandler>(1);
+        slot.data = held;
+        slot.dispose = void() { camera_release_frame_handler(held.handler); free(held); };
+    } else { camera_release_frame_handler(held.handler); }
+    held.handler = on_frame;
+    if (held.asked && (held.options.width != options.width || held.options.height != options.height ||
+                       held.options.fps != options.fps)) {
+        camera_native_frames(1, options.width, options.height, options.fps);
+    }
+    held.options = options;
+    use_native_event("camera_frame", void(string payload) { camera_deliver_frame(held.handler); });
+    use_mount(void() {
+        camera_frame_users++;
+        held.asked = true;
+        camera_native_frames(1, held.options.width, held.options.height, held.options.fps);
+    }, void() {
+        camera_frame_users--;
+        if (camera_frame_users == 0) { camera_native_frames(0, 0, 0, 0); }
+    });
+}
+
+// The fixed-point (1 << 16) coefficients that turn one matrix and range's YUV into RGB.
+struct CameraYuvCoeffs { int y_offset; int y_scale; int v_r; int u_g; int v_g; int u_b; }
+
+// The coefficients for `matrix` (a CameraMatrix), full range (Y 0-255, chroma 0-255 about
+// 128) or limited (Y 16-235, chroma 16-240).
+CameraYuvCoeffs camera_yuv_coeffs(int matrix, bool full_range) {
+    double kr = 0.299;
+    double kb = 0.114;
+    if (matrix == CameraBT709) { kr = 0.2126; kb = 0.0722; }
+    double kg = 1.0 - kr - kb;
+    double ys = 1.0;
+    double cs = 1.0;
+    int offset = 0;
+    if (!full_range) { ys = 255.0 / 219.0; cs = 255.0 / 224.0; offset = 16; }
+    double one = 65536.0;
+    CameraYuvCoeffs c;
+    c.y_offset = offset;
+    c.y_scale = (int)(ys * one + 0.5);
+    c.v_r = (int)(2.0 * (1.0 - kr) * cs * one + 0.5);
+    c.u_b = (int)(2.0 * (1.0 - kb) * cs * one + 0.5);
+    c.u_g = (int)(2.0 * kb * (1.0 - kb) / kg * cs * one + 0.5);
+    c.v_g = (int)(2.0 * kr * (1.0 - kr) / kg * cs * one + 0.5);
+    return c;
+}
+
+// A fixed-point value rounded to 0-255.
+uint8 camera_clamp8(int value) {
+    int v = (value + 32768) >> 16;
+    if (v < 0) { return 0; }
+    if (v > 255) { return 255; }
+    return (uint8)v;
+}
+
+// One pixel's Y, U (Cb) and V (Cr) as R, G and B into `rgb[0..2]`.
+void camera_yuv_to_rgb(*CameraYuvCoeffs c, int y, int u, int v, *uint8 rgb) {
+    int yt = (y - c.y_offset) * c.y_scale;
+    int cb = u - 128;
+    int cr = v - 128;
+    rgb[0] = camera_clamp8(yt + c.v_r * cr);
+    rgb[1] = camera_clamp8(yt - c.u_g * cb - c.v_g * cr);
+    rgb[2] = camera_clamp8(yt + c.u_b * cb);
+}
+
+// The frame's width once turned upright (to_rgba with `upright`), or as it is.
+int CameraFrame_out_width(*CameraFrame self, bool upright) {
+    if (upright && (self.rotation == 90 || self.rotation == 270)) { return self.height; }
+    return self.width;
+}
+
+// The frame's height once turned upright, or as it is.
+int CameraFrame_out_height(*CameraFrame self, bool upright) {
+    if (upright && (self.rotation == 90 || self.rotation == 270)) { return self.width; }
+    return self.height;
+}
+
+// The frame as RGBA (alpha 255) into `out`, `out_stride` bytes a row, with its own matrix
+// and range; turned by its rotation when `upright` (out_width and out_height give the size
+// `out` needs). Pure Eskiu, on the calling thread.
+void CameraFrame_to_rgba(*CameraFrame self, *uint8 out, int out_stride, bool upright) {
+    CameraYuvCoeffs c = camera_yuv_coeffs(self.matrix, self.full_range);
+    int w = self.width;
+    int h = self.height;
+    int turn = upright ? self.rotation : 0;
+    *uint8 yp = self.planes[0].data;
+    int y_row = self.planes[0].row_stride;
+    int y_pix = self.planes[0].pixel_stride;
+    *uint8 up = null;
+    *uint8 vp = null;
+    int c_row = 0;
+    int c_pix = 0;
+    if (self.format == CameraNV12 || self.format == CameraNV21) {
+        *uint8 base = self.planes[1].data;
+        up = self.format == CameraNV12 ? base : base + 1;
+        vp = self.format == CameraNV12 ? base + 1 : base;
+        c_row = self.planes[1].row_stride;
+        c_pix = self.planes[1].pixel_stride;
+    } else if (self.format != CameraRGBA) {
+        up = self.planes[1].data;
+        vp = self.planes[2].data;
+        c_row = self.planes[1].row_stride;
+        c_pix = self.planes[1].pixel_stride;
+    }
+    int v_row = self.format == CameraI420 || self.format == CameraYUV420 ? self.planes[2].row_stride : c_row;
+    int v_pix = self.format == CameraI420 || self.format == CameraYUV420 ? self.planes[2].pixel_stride : c_pix;
+    for (y in 0..h) {
+        for (x in 0..w) {
+            int dx = x;
+            int dy = y;
+            if (turn == 90) { dx = h - 1 - y; dy = x; }
+            else if (turn == 180) { dx = w - 1 - x; dy = h - 1 - y; }
+            else if (turn == 270) { dx = y; dy = w - 1 - x; }
+            *uint8 px = out + (int64)dy * out_stride + (int64)dx * 4;
+            if (self.format == CameraRGBA) {
+                *uint8 src = yp + (int64)y * y_row + (int64)x * y_pix;
+                px[0] = src[0]; px[1] = src[1]; px[2] = src[2]; px[3] = src[3];
+                continue;
+            }
+            int luma = yp[(int64)y * y_row + (int64)x * y_pix];
+            int cu = up[(int64)(y >> 1) * c_row + (int64)(x >> 1) * c_pix];
+            int cv = vp[(int64)(y >> 1) * v_row + (int64)(x >> 1) * v_pix];
+            camera_yuv_to_rgb(&c, luma, cu, cv, px);
+            px[3] = 255;
+        }
+    }
+}
