@@ -17,6 +17,8 @@ jobs:
           echo "$HOME/.eskiu/bin" >> $GITHUB_PATH
       - name: Tests
         run: eskiuc test
+      - name: API reference is current
+        run: python3 -I tools/gen_api.py --check
       - name: Tests (-O2)
         run: eskiuc test -O2
       - name: The example type-checks

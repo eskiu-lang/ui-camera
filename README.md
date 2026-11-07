@@ -102,6 +102,10 @@ ui run android    # or ios, web
 each call reaching it, photos with paths that have spaces and with `blob:` URLs, each failure,
 a malformed message, and no handler after the screen unmounts.
 
+## Documentation
+
+Every public function and type, with its documentation, is in the [API reference](docs/api.md).
+
 ## License
 
 MIT
