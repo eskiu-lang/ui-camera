@@ -84,6 +84,36 @@ def quote_modules(text):
     return "`".join(parts)
 
 
+def unquoted(code):
+    """code with the insides of string and char literals blanked (for counting braces)."""
+    out = []
+    q = None
+    i = 0
+    while i < len(code):
+        c = code[i]
+        if q:
+            if c == "\\":
+                out.append("  ")
+                i += 2
+                continue
+            if c == q:
+                q = None
+                out.append(c)
+            else:
+                out.append(" ")
+        else:
+            if c in "\"'":
+                q = c
+            out.append(c)
+        i += 1
+    return "".join(out)
+
+
+def braces(code):
+    u = unquoted(code)
+    return u.count("{") - u.count("}")
+
+
 def strip_trailing_comment(line):
     in_str = False
     i = 0
@@ -105,10 +135,10 @@ def body_of(lines, i):
     while j < len(lines):
         line = lines[j]
         code, _ = strip_trailing_comment(line)
-        depth += code.count("{") - code.count("}")
+        depth += braces(code)
         if j > i:
             members.append(line)
-        if depth <= 0 and "{" in "".join(lines[i:j + 1]) and "}" in code:
+        if depth <= 0 and "{" in unquoted("".join(lines[i:j + 1])) and "}" in unquoted(code):
             break
         j += 1
     return members, j + 1
@@ -147,7 +177,7 @@ def render_body(members):
                     head = head[:head.index("{")].rstrip() + ";"
                 out.append("    " + head + (("   // " + cmt) if cmt else ""))
             pending = []
-        depth += code.count("{") - code.count("}")
+        depth += braces(code)
         if depth < 0:
             depth = 0
     return out
@@ -160,7 +190,7 @@ def signature(lines, i):
     while j < len(lines):
         code, _ = strip_trailing_comment(lines[j])
         text += " " + code.strip()
-        if "{" in code or code.rstrip().endswith(";"):
+        if "{" in unquoted(code) or code.rstrip().endswith(";"):
             break
         j += 1
     head = text.strip()
@@ -175,8 +205,8 @@ def signature(lines, i):
     started = False
     while k < len(lines):
         code, _ = strip_trailing_comment(lines[k])
-        depth += code.count("{") - code.count("}")
-        if "{" in code:
+        depth += braces(code)
+        if "{" in unquoted(code):
             started = True
         if (started and depth <= 0) or (not started and code.rstrip().endswith(";")):
             return head, k + 1
