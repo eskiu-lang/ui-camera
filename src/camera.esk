@@ -5,6 +5,8 @@
 import <string>;
 import <ui>;
 
+// What a Photo reports: a photo is ready, the user cancelled, the camera permission is
+// denied, there is no camera (a simulator), or it failed.
 enum PhotoStatus { PhotoReady, PhotoCancelled, PhotoDenied, PhotoUnavailable, PhotoFailed }
 
 // A photo, or why there is none. `path` is the file (borrowed for the handler's call: copy it
@@ -45,6 +47,8 @@ Photo camera_read(string payload) {
 // The latest render's handler, kept in the hook's slot.
 struct PhotoHandler { fn(Photo)->void handler; }
 
+// Frees a photo handler's closure; use_photos calls it when it replaces or drops the
+// handler.
 void camera_release_handler(escaping fn(Photo)->void handler) { free_closure(handler); }
 
 // `on_photo` gets each photo (or failure) the camera, the picker or a capture hands back while
