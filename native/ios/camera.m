@@ -132,6 +132,14 @@ static AVCaptureSessionPreset framePreset(int width, int height) {
 @property(nonatomic, copy) NSString *facing;
 @end
 
+// The queue sessions start and stop on, in order.
+static dispatch_queue_t sessionQueue(void) {
+    static dispatch_queue_t queue;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ queue = dispatch_queue_create("org.eskiu.camera.session", DISPATCH_QUEUE_SERIAL); });
+    return queue;
+}
+
 // The view mounted last, which camera_native_capture captures from.
 static __weak EskiuCameraView *live;
 
@@ -181,7 +189,7 @@ static __weak EskiuCameraView *live;
     AVCaptureVideoPreviewLayer *preview = (AVCaptureVideoPreviewLayer *)self.layer;
     preview.videoGravity = AVLayerVideoGravityResizeAspectFill;
     preview.session = session;
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{ [session startRunning]; });
+    dispatch_async(sessionQueue(), ^{ [session startRunning]; });
 }
 - (void)stop {
     AVCaptureSession *session = self.session;
@@ -189,7 +197,10 @@ static __weak EskiuCameraView *live;
     [self.frames setSampleBufferDelegate:nil queue:NULL];
     self.frames = nil;
     dropLatest();
-    if (session) dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{ [session stopRunning]; });
+    // Stopped before returning (after a start still queued, about a tenth of a second): a
+    // session started right after, such as AR on the screen that replaces this one, finds
+    // the camera free.
+    if (session) dispatch_sync(sessionQueue(), ^{ [session stopRunning]; });
 }
 - (void)didMoveToWindow {
     [super didMoveToWindow];
