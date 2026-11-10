@@ -20,3 +20,9 @@ All notable changes to this package are documented in this file. The format is b
   `out_height`, `camera_yuv_coeffs` and `camera_yuv_to_rgb`: BT.601 and BT.709, full and
   limited range, in pure Eskiu.
 - iOS links CoreMedia and CoreVideo.
+
+### Fixed
+
+- iOS: a camera view taken off the screen stops its session before it returns (sessions start
+  and stop in order on one queue), so a session started right after, such as AR on the next
+  screen, gets the camera at once instead of about nine seconds later.
