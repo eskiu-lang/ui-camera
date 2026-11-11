@@ -3,4 +3,4 @@ name = "camera"
 version = "0.2.0"
 
 [deps]
-ui = { git = "https://github.com/eskiu-lang/ui", rev = "v0.4.0" }
+ui = { git = "https://github.com/eskiu-lang/ui", rev = "v0.5.0" }
