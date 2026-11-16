@@ -1,0 +1,21 @@
+# The macOS jobs, apart from CI: the org's macOS runners can take long to start, and a
+# job that waits too long is cancelled; here that does not mark CI failed.
+name: macOS
+on:
+  # once per change: main (main and the tags only get commits that already ran here)
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Eskiu
+        run: brew install eskiu-lang/eskiu/eskiu
+      - name: Tests
+        run: eskiuc test
+      - name: The example type-checks
+        run: cd examples/snap && eskiuc fetch && eskiuc src/main.esk --test-typechecker

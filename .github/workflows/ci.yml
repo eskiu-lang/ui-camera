@@ -26,14 +26,3 @@ jobs:
         run: eskiuc test -O2
       - name: The example type-checks
         run: cd examples/snap && eskiuc fetch && eskiuc src/main.esk --test-typechecker
-
-  macos:
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Eskiu
-        run: brew install eskiu-lang/eskiu/eskiu
-      - name: Tests
-        run: eskiuc test
-      - name: The example type-checks
-        run: cd examples/snap && eskiuc fetch && eskiuc src/main.esk --test-typechecker
