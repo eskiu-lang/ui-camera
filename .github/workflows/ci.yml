@@ -1,8 +1,11 @@
 name: CI
 
 on:
+  # once per change: main (main and the tags only get commits that already ran here)
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   linux:
