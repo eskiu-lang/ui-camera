@@ -3,17 +3,17 @@
 </p>
 
 <h2 align="center">camera</h2>
-<p align="center">Photos for apps on eskiu-lang/ui: the library, the camera and a live view.</p>
+<p align="center">Photos for apps on eskiu-packages/ui: the library, the camera and a live view.</p>
 <p align="center"><sub>Part of the <a href="https://github.com/eskiu-lang">Eskiu</a> project</sub></p>
 <p align="center">
   <a href="https://eskiu-lang.org/ui.html">eskiu-lang.org/ui</a> &nbsp;&middot;&nbsp;
   <a href="#use-it">Use it</a> &nbsp;&middot;&nbsp;
   <a href="examples/snap">Example</a> &nbsp;&middot;&nbsp;
-  <a href="https://github.com/eskiu-lang/ui">ui</a>
+  <a href="https://github.com/eskiu-packages/ui">ui</a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/eskiu-lang/ui-camera/actions/workflows/ci.yml"><img src="https://github.com/eskiu-lang/ui-camera/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/eskiu-packages/ui-camera/actions/workflows/ci.yml"><img src="https://github.com/eskiu-packages/ui-camera/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/version-0.2.1-6448d4" alt="Version 0.2.1">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
 </p>
@@ -32,7 +32,7 @@ live in a `CameraView` and captures what it shows. Each photo comes back as a JP
 In an app made with `ui new`:
 
 ```bash
-eskiuc add camera --git https://github.com/eskiu-lang/ui-camera --rev v0.2.1
+eskiuc add camera --git https://github.com/eskiu-packages/ui-camera --rev v0.2.1
 ```
 
 Its `ui.toml` brings AVFoundation and PhotosUI with a camera usage text on iOS, and the camera

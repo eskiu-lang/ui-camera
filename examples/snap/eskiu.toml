@@ -4,5 +4,5 @@ version = "0.1.0"
 main = "src/main.esk"
 
 [deps]
-ui = { git = "https://github.com/eskiu-lang/ui", rev = "v0.4.0" }
+ui = { git = "https://github.com/eskiu-packages/ui", rev = "v0.6.0" }
 camera = { path = "../.." }
