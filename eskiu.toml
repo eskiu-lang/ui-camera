@@ -1,6 +1,6 @@
 [package]
 name = "camera"
-version = "0.2.2"
+version = "0.2.3"
 
 [deps]
-ui = { git = "https://github.com/eskiu-packages/ui", rev = "v0.6.1" }
+ui = { git = "https://github.com/eskiu-packages/ui", rev = "v0.7.0" }
