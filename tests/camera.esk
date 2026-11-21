@@ -20,6 +20,8 @@ void camera_native_frames(int on, int width, int height, int fps) {}
 int camera_native_frame_acquire(*int64 info) { return 0; }
 
 void camera_native_frame_release() {}
+// The desktop's native side, where camera_supported asks it (macOS): no camera here.
+int camera_native_supported() { return 0; }
 
 String last;
 int photos;
@@ -99,7 +101,7 @@ int main() {
     ui_frame();
     check(photos == before, "no handler once unmounted");
     // No camera to show on the desktop, said before a CameraView mounts.
-    check(!camera_supported(), "no camera on the desktop");
+    check(!camera_supported(), "no camera on this desktop");
     ui_shutdown();
     mounted.free();
     String_free(&last);

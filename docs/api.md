@@ -74,7 +74,8 @@ bool camera_supported()
 
 Whether the device has a camera that CameraView, camera_capture and use_camera_frames can
 show, known before one is mounted: false on the iOS simulator, a phone without a camera, a
-browser without getUserMedia (a page not served over https) and the desktop. The photo
+browser without getUserMedia (a page not served over https), a Mac without a camera, Linux
+and Windows. The photo
 library (camera_pick_photo) does not need it. True does not mean the user allowed the
 camera: that is asked when the first CameraView mounts.
 

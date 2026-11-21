@@ -61,6 +61,9 @@ void camera_native_pick(void) {
 
 void camera_native_take(void) { emit(@"unavailable"); }
 
+// camera_supported: the Mac has a camera (built in or plugged in).
+int camera_native_supported(void) { return [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo] ? 1 : 0; }
+
 // `then` once the user allowed the camera, else the reason on the channel.
 static void withCamera(void (^then)(void)) {
     if (![AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo]) { emit(@"unavailable"); return; }

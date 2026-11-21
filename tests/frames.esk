@@ -38,6 +38,8 @@ int camera_native_frame_acquire(*int64 info) {
 }
 
 void camera_native_frame_release() { releases++; }
+// The desktop's native side, where camera_supported asks it (macOS): no camera here.
+int camera_native_supported() { return 0; }
 
 void check(bool ok, string what) {
     if (!ok) {

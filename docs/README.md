@@ -36,7 +36,8 @@ there, and the library works. The Android emulator's virtual camera works.
 | iOS | true with a camera; false on the simulator |
 | Android | true with a camera (`FEATURE_CAMERA_ANY`) |
 | Web | true where the browser has `getUserMedia` (a page served over https or from localhost) |
-| macOS, Linux, Windows | false |
+| macOS | true with a camera (the built-in one, or an external one) |
+| Linux, Windows | false |
 
 The library (`camera_pick_photo`) needs no camera. True does not mean the camera is allowed:
 the permission is asked when the first `CameraView` mounts.
