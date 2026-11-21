@@ -8,3 +8,9 @@ NSCameraUsageDescription = "Takes photos"
 
 [android]
 permissions = ["android.permission.CAMERA"]
+
+[macos]
+frameworks = ["AVFoundation", "CoreMedia", "CoreVideo", "ImageIO", "UniformTypeIdentifiers"]
+
+[macos.plist]
+NSCameraUsageDescription = "Takes photos"
