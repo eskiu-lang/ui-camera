@@ -18,6 +18,18 @@ Guides and reference for ui-camera. The [README](../README.md) has the overview.
 The simulator has no camera: `CameraView` and `camera_take_photo` give `PhotoUnavailable`
 there, and the library works. The Android emulator's virtual camera works.
 
+`camera_supported()` says before a `CameraView` is mounted whether there is a camera to show:
+
+| Platform | `camera_supported()` |
+|---|---|
+| iOS | true with a camera; false on the simulator |
+| Android | true with a camera (`FEATURE_CAMERA_ANY`) |
+| Web | true where the browser has `getUserMedia` (a page served over https or from localhost) |
+| macOS, Linux, Windows | false |
+
+The library (`camera_pick_photo`) needs no camera. True does not mean the camera is allowed:
+the permission is asked when the first `CameraView` mounts.
+
 ## The example
 
 `examples/snap` shows the camera in a card with its shutter and a switch between cameras, the

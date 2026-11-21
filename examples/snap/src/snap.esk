@@ -32,13 +32,15 @@ string snap_problem(int status) {
 void CameraCard(*Signal<bool> front, *Signal<int> problem) {
     Column(Style{aspect_ratio: 0.75, radius: 28, background: ink(), shadow: 12, gap: 0}) {
         // The card is raised, so on iOS it does not clip: its children round their own corners.
-        CameraView(Style{absolute: true, left: 0, top: 0, right: 0, bottom: 0, radius: 28}, front.get());
-        if (problem.get() >= 0) {
+        // Known before mounting: no camera, no CameraView.
+        bool none = !camera_supported();
+        if (!none) { CameraView(Style{absolute: true, left: 0, top: 0, right: 0, bottom: 0, radius: 28}, front.get()); }
+        if (none || problem.get() >= 0) {
             Column(Style{absolute: true, left: 0, top: 0, right: 0, bottom: 0, padding: 28, gap: 8, justify: JustifyCenter,
                          align: AlignCenter, radius: 28, background: ink()}) {
                 TextWith(Style{font_size: 40}, "📷");
                 TextWith(Style{font_size: 17, font_weight: 700, color: white()}, "No camera here");
-                TextWith(Style{font_size: 15, color: rgba(255, 255, 255, 190)}, snap_problem(problem.get()));
+                TextWith(Style{font_size: 15, color: rgba(255, 255, 255, 190)}, snap_problem(none ? PhotoUnavailable : problem.get()));
             }
         }
         // The controls over the bottom of the preview.

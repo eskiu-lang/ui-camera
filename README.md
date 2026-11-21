@@ -70,6 +70,7 @@ void Shoot() {
 | `use_photos(fn(Photo))` | Each photo, or failure, that a picker, the camera or a capture hands back while the scope is mounted. Mount one per screen. |
 | `Photo` | `status`, and when it is `PhotoReady` the file's `path` (borrowed for the call), `width` and `height` in pixels. |
 | `PhotoStatus` | `PhotoReady`, `PhotoCancelled`, `PhotoDenied` (no camera permission), `PhotoUnavailable` (no camera, as on a simulator) or `PhotoFailed`. |
+| `camera_supported()` | Whether there is a camera to show here (false on the iOS simulator, a browser without `getUserMedia`, the desktop), before a `CameraView` mounts. |
 | `camera_pick_photo()` | The system's photo picker; it needs no permission. |
 | `camera_take_photo()` | The system's camera app. |
 | `CameraView(Style, bool front)` | The camera, live, filling its box (cropped): the back camera, or the front one. The first one mounted asks for the camera permission. |
