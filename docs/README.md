@@ -14,6 +14,17 @@ Guides and reference for ui-camera. The [README](../README.md) has the overview.
 | iOS | `PHPickerViewController` | `UIImagePickerController` | `AVCaptureSession` and `AVCapturePhotoOutput` |
 | Android | The photo picker (`ACTION_PICK_IMAGES`, Android 13+), else `ACTION_GET_CONTENT` | `ACTION_IMAGE_CAPTURE` into a MediaStore entry the package deletes after (Android 10+) | Camera2 into a `TextureView`, closed while the app is in the background |
 | Web | A file input | A file input with `capture` (phones open the camera; desktops choose a file) | `getUserMedia` into a `<video>` |
+| macOS | `NSOpenPanel` (any image file), decoded with ImageIO | None: `PhotoUnavailable` (macOS has no system camera screen) | `AVCaptureSession` and `AVCapturePhotoOutput`, the built-in camera or the default one |
+| Linux | GTK's file dialog (any image file), decoded with GdkPixbuf | None: `PhotoUnavailable` | None: the view reports `PhotoUnavailable` and `use_camera_frames` gets no frames |
+| Windows | The system's open dialog (any image file), decoded with GDI+ | None: `PhotoUnavailable` | None: the view reports `PhotoUnavailable` and `use_camera_frames` gets no frames |
+
+On macOS an app that takes photos shows a `CameraView` and calls `camera_capture`, since
+there is no system camera screen to open; frames come as NV12, upright as they are (rotation
+0), and a Mac's built-in camera is the front one. On Linux a camera would need PipeWire's
+camera portal or V4L2, and on Windows Media Foundation's capture; neither is done yet, so the
+camera is unavailable there and never shows a made-up picture. Photos chosen on the desktops
+are saved in the user's cache directory (macOS, Linux) or temporary folder (Windows). The
+desktop's `--webview` builds use the web's file input and `getUserMedia`.
 
 The simulator has no camera: `CameraView` and `camera_take_photo` give `PhotoUnavailable`
 there, and the library works. The Android emulator's virtual camera works.
@@ -37,7 +48,7 @@ library and the camera app, and the photos taken:
 
 ```bash
 cd examples/snap
-ui run android    # or ios, web
+ui run android    # or ios, web, macos, linux, windows
 ```
 
 ## Tests

@@ -25,6 +25,17 @@ live in a `CameraView` and captures what it shows. Each photo comes back as a JP
 `Image` shows: upright, at most 2048 pixels on its longer side, in the app's cache directory
 (a `blob:` URL on the web).
 
+| Platform | Library | System camera | Live view, capture, frames |
+|---|---|---|---|
+| iOS | yes | yes | yes |
+| Android | yes | yes | yes |
+| Web | a file input | a file input with `capture` | yes |
+| macOS | an open panel | no (`PhotoUnavailable`) | yes |
+| Linux | a file dialog | no (`PhotoUnavailable`) | no (`PhotoUnavailable`, no frames) |
+| Windows | an open dialog | no (`PhotoUnavailable`) | no (`PhotoUnavailable`, no frames) |
+
+[docs/README.md](docs/README.md#platforms) has the details.
+
 ![The Snap example: the photo library on iOS, the live camera with photos taken on Android, and the same in a browser](assets/snap.png)
 
 ## Add it
@@ -35,8 +46,8 @@ In an app made with `ui new`:
 eskiuc add camera --git https://github.com/eskiu-packages/ui-camera --rev v0.2.3
 ```
 
-Its `ui.toml` brings AVFoundation and PhotosUI with a camera usage text on iOS, and the camera
-permission on Android. Put your own text in the app's `ui.toml`, which wins over the package's:
+Its `ui.toml` brings AVFoundation and PhotosUI with a camera usage text on iOS, AVFoundation
+and a camera usage text on macOS, and the camera permission on Android. Put your own text in the app's `ui.toml`, which wins over the package's:
 
 ```toml
 [ios.plist]

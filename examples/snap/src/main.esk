@@ -1,5 +1,5 @@
 // Snap: the camera live, the system's camera and photo library, and the photos taken.
-// `ui run android` (or ios, web).
+// `ui run android` (or ios, web, macos; linux and windows only pick photos).
 import "snap.esk";
 
 void ui_app_start(int which) {

@@ -8,8 +8,20 @@ All notable changes to this package are documented in this file. The format is b
 ### Added
 
 - `camera_supported()`: whether there is a camera to show, before a `CameraView` mounts. False
-  on the iOS simulator, a phone without a camera, a browser without `getUserMedia` and the
-  desktop. docs/README.md says what each platform does.
+  on the iOS simulator, a phone without a camera, a browser without `getUserMedia`, a Mac
+  without a camera, Linux and Windows. docs/README.md says what each platform does.
+- macOS: the photo library through an open panel, and the live `CameraView`, `camera_capture`
+  and `use_camera_frames` through AVFoundation. `camera_take_photo` answers `PhotoUnavailable`
+  (macOS has no system camera screen).
+- Linux and Windows: the photo library through the system's file dialog. The camera is
+  unavailable there: `camera_take_photo`, a `CameraView` and `camera_capture` answer
+  `PhotoUnavailable`, and `use_camera_frames` gets no frames.
+- CI builds the example on the native desktop hosts (`tools/ci_desktop.sh`).
+
+### Fixed
+
+- Native desktop builds of an app using the package link (before, the externs were missing on
+  macOS, Linux and Windows).
 
 ## [0.2.3] - 2026-11-20
 
