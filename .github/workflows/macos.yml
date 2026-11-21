@@ -19,3 +19,5 @@ jobs:
         run: eskiuc test
       - name: The example type-checks
         run: cd examples/snap && eskiuc fetch && eskiuc src/main.esk --test-typechecker
+      - name: Desktop
+        run: tools/ci_desktop.sh macos

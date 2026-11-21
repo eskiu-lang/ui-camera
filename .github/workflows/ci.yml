@@ -26,3 +26,30 @@ jobs:
         run: eskiuc test -O2
       - name: The example type-checks
         run: cd examples/snap && eskiuc fetch && eskiuc src/main.esk --test-typechecker
+
+  # The native desktop hosts: tools/ci_desktop.sh builds the example for GTK 4, and for Win32
+  # with MinGW-w64 from Linux (on a Windows machine the ui tool cannot build a package's
+  # native/windows code yet: its object names keep the drive's colon and backslashes).
+  desktop-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Eskiu
+        run: |
+          mkdir -p $HOME/.eskiu
+          curl -fsSL https://github.com/eskiu-lang/eskiu/releases/latest/download/eskiuc-linux-x86_64.tar.gz | tar -xz -C $HOME/.eskiu
+          echo "$HOME/.eskiu/bin" >> $GITHUB_PATH
+      - name: GTK 4 and MinGW-w64
+        run: |
+          sudo rm -f /var/lib/man-db/auto-update
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends libgtk-4-dev g++-mingw-w64-x86-64-posix binutils-mingw-w64-x86-64 > /dev/null
+      - name: Linux
+        run: tools/ci_desktop.sh linux
+      - name: Windows, cross-compiled
+        env:
+          CXX: x86_64-w64-mingw32-g++-posix
+          CC: x86_64-w64-mingw32-gcc-posix
+          WINDRES: x86_64-w64-mingw32-windres
+        run: tools/ci_desktop.sh windows
