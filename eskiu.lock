@@ -1,3 +1,3 @@
 # eskiu.lock: written by eskiuc (eskiuc fetch updates it); do not edit.
 camera	root	.
-ui	git	https://github.com/eskiu-packages/ui	v0.6.1	e06770759ce96d45db7f9f5a08001ec10cfdb30d
+ui	git	https://github.com/eskiu-packages/ui	v0.7.0	7401cf032e1b9e3c145f08353be0c54daaa460de
