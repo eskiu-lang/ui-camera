@@ -3,6 +3,7 @@
 // use_camera_frames (camera.mjs). Photos are blob: URLs, upright and at most 2048 pixels on
 // the longer side.
 mergeInto(LibraryManager.library, {
+  camera_native_supported: function() { return navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? 1 : 0; },
   camera_native_pick: function() { window.eskiuCamera.choose(false); },
   camera_native_take: function() { window.eskiuCamera.choose(true); },
   camera_native_capture: function() { window.eskiuCamera.capture(); },

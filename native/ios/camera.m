@@ -54,6 +54,9 @@ static EskiuCamera *shared;
 }
 @end
 
+// camera_supported: a camera to show (the simulator has none).
+int camera_native_supported(void) { return [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo] != nil; }
+
 void camera_native_pick(void) {
     if (!shared) shared = [EskiuCamera new];
     PHPickerConfiguration *config = [PHPickerConfiguration new];

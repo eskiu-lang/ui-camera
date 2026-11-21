@@ -66,6 +66,24 @@ void use_photos(escaping fn(Photo)->void on_photo) {
     use_native_event("camera", void(string payload) { held.handler(camera_read(payload)); });
 }
 
+// The platform's side of camera_supported (native/ios, native/android, native/web): 1 when the
+// device has a camera the package can show (iOS and Android) or the browser has getUserMedia
+// (the web).
+extern int camera_native_supported();
+
+// Whether the device has a camera that CameraView, camera_capture and use_camera_frames can
+// show, known before one is mounted: false on the iOS simulator, a phone without a camera, a
+// browser without getUserMedia (a page not served over https) and the desktop. The photo
+// library (camera_pick_photo) does not need it. True does not mean the user allowed the
+// camera: that is asked when the first CameraView mounts.
+bool camera_supported() {
+#if defined(__ANDROID__) || defined(TARGET_OS_IOS) || defined(__wasm__)
+    return camera_native_supported() != 0;
+#else
+    return false;
+#endif
+}
+
 // The system's photo picker: the user chooses one photo, or cancels.
 void camera_pick_photo() { camera_native_pick(); }
 

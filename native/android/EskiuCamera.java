@@ -23,6 +23,12 @@ import org.eskiu.ui.UiActivity;
 public final class EskiuCamera {
     public static void setup() { CameraView.register(); }
 
+    // camera_supported (camera.c): the device has a camera.
+    public static boolean supported() {
+        UiActivity activity = UiActivity.current();
+        return activity != null && activity.getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_CAMERA_ANY);
+    }
+
     static void emit(String payload) { UiActivity.emit("camera", payload); }
 
     public static void pick() {

@@ -12,6 +12,15 @@ static void call(const char *method) {
     (*env)->DeleteLocalRef(env, type);
 }
 
+int camera_native_supported(void) {
+    JNIEnv *env = ui_jni_env();
+    jclass type = ui_find_class("org.eskiu.camera.EskiuCamera");
+    if (!type) return 0;
+    jboolean has = (*env)->CallStaticBooleanMethod(env, type, (*env)->GetStaticMethodID(env, type, "supported", "()Z"));
+    (*env)->DeleteLocalRef(env, type);
+    return has ? 1 : 0;
+}
+
 void camera_native_pick(void) { call("pick"); }
 
 void camera_native_take(void) { call("take"); }

@@ -98,6 +98,8 @@ int main() {
     ui_event_native("camera", "photo 1 1 /x.jpg");
     ui_frame();
     check(photos == before, "no handler once unmounted");
+    // No camera to show on the desktop, said before a CameraView mounts.
+    check(!camera_supported(), "no camera on the desktop");
     ui_shutdown();
     mounted.free();
     String_free(&last);
